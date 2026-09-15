@@ -1,0 +1,1 @@
+Radhe Kathiyawadi is configured as an Android/mobile-first Flutter project. The next step is building a signed Android APK/AAB on a machine with the Flutter/Android SDK installed.
