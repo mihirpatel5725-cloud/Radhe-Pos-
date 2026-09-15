@@ -1,0 +1,94 @@
+name: Build Radhe Kathiyawadi APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.0'
+          channel: stable
+          cache: true
+
+      - name: Find Flutter project
+        id: project
+        shell: bash
+        run: |
+          set -e
+
+          PROJECT=$(find . -name pubspec.yaml -not -path './.git/*' -printf '%h\n' | head -1)
+
+          if [ -z "$PROJECT" ]; then
+            echo "ERROR: pubspec.yaml not found."
+            exit 1
+          fi
+
+          echo "Flutter project found at: $PROJECT"
+          echo "path=$PROJECT" >> "$GITHUB_OUTPUT"
+
+      - name: Generate Android project
+        working-directory: ${{ steps.project.outputs.path }}
+        shell: bash
+        run: |
+          set -e
+
+          if [ ! -d "android" ]; then
+            echo "Android folder not found. Generating Android project..."
+            flutter create . --platforms=android
+          else
+            echo "Android folder already exists."
+          fi
+
+      - name: Get dependencies
+        working-directory: ${{ steps.project.outputs.path }}
+        run: flutter pub get
+
+      - name: Analyze Flutter project
+        working-directory: ${{ steps.project.outputs.path }}
+        run: flutter analyze
+
+      - name: Build release APK
+        working-directory: ${{ steps.project.outputs.path }}
+        run: flutter build apk --release
+
+      - name: Verify APK
+        working-directory: ${{ steps.project.outputs.path }}
+        shell: bash
+        run: |
+          set -e
+
+          APK="build/app/outputs/flutter-apk/app-release.apk"
+
+          if [ ! -f "$APK" ]; then
+            echo "ERROR: APK was not generated."
+            exit 1
+          fi
+
+          echo "APK successfully generated:"
+          ls -lh "$APK"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: radhe-kathiyawadi-release-apk
+          path: ${{ steps.project.outputs.path }}/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+      # Your project will need to have tests in test/ and a dependency on
+      # package:test for this step to succeed. Note that Flutter projects will
+      # want to change this to 'flutter test'.
+      - name: Run tests
+        run: dart test
